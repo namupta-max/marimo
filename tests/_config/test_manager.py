@@ -214,6 +214,40 @@ def test_save_config_with_none_does_not_raise(tmp_path: Path) -> None:
     assert "be terse" in contents
 
 
+def test_save_config_does_not_overwrite_unparseable_file(
+    tmp_path: Path,
+) -> None:
+    """A user config that fails to parse reads as {}, so saving over it would
+    replace every setting in it with the defaults. Refuse instead."""
+    config_path = tmp_path / "marimo.toml"
+    original = textwrap.dedent(
+        """\
+        [keymap]
+        preset = "vim"
+
+        [ai]
+        rules = "prefer polars"
+
+        [keymap]
+        preset = "default"
+        """
+    )
+    config_path.write_text(original)
+    manager = UserConfigStore()
+
+    with (
+        patch.object(
+            manager, "get_config_path", return_value=str(config_path)
+        ),
+        pytest.raises(ValueError, match="could not be parsed"),
+    ):
+        manager.save_config(
+            cast(PartialMarimoConfig, {"display": {"theme": "dark"}})
+        )
+
+    assert config_path.read_text() == original
+
+
 def test_user_config_keeps_empty_dotenv(tmp_path: Path) -> None:
     """An explicit empty list disables loading in user configuration too."""
     config_path = tmp_path / "marimo.toml"
